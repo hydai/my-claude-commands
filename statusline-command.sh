@@ -3,6 +3,11 @@
 # Claude Code Status Line Script
 # Displays: Live Date | Git Branch | Current Model | Session Cost | Daily Usage % | Session Remaining Time
 
+# Configuration
+# Set your monthly budget in USD (adjust based on your Claude Code subscription plan)
+# Common plans: $100, $200, $500, etc.
+MONTHLY_BUDGET_USD=200
+
 # Color definitions (256-color palette for smooth appearance)
 COLOR_RESET="\033[0m"
 COLOR_DATETIME="\033[38;5;250m"  # Light gray
@@ -126,7 +131,7 @@ if command -v ccstat >/dev/null 2>&1; then
         # Calculate daily usage percentage
         # This shows how much of your daily budget you've used today
         # Formula: (today's total cost / daily budget) * 100
-        # Where daily budget = $200 / days_in_current_month
+        # Where daily budget = $MONTHLY_BUDGET_USD / days_in_current_month
         
         # Get today's cost from ccstat daily
         today_cost=$(ccstat daily --json --quiet 2>/dev/null | jq -r '.daily[-1].total_cost // 0' 2>/dev/null)
@@ -137,9 +142,9 @@ if command -v ccstat >/dev/null 2>&1; then
             
             if [ -n "$days_in_month" ] && [ "$days_in_month" -gt 0 ]; then
                 # Calculate daily budget
-                # Formula: $200 monthly budget / days_in_month
-                # Example: August has 31 days, so daily budget = $200/31 = $6.45
-                daily_budget=$(echo "scale=2; 200 / $days_in_month" | bc 2>/dev/null)
+                # Formula: $MONTHLY_BUDGET_USD / days_in_month
+                # Example: With $200 budget and 31 days in August, daily budget = $200/31 = $6.45
+                daily_budget=$(echo "scale=2; $MONTHLY_BUDGET_USD / $days_in_month" | bc 2>/dev/null)
                 
                 if [ -n "$daily_budget" ]; then
                     # Calculate usage percentage
