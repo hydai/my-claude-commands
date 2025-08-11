@@ -78,54 +78,40 @@ if command -v ccstat >/dev/null 2>&1; then
             session_cost_raw=$(printf "$%.2f" "$cost_value")
         fi
         
-        # Calculate remaining time based on 5-hour aligned blocks
-        # Claude Code uses 5-hour billing periods aligned to UTC hours (0:00, 5:00, 10:00, 15:00, 20:00)
+        # Extract the actual end time from ccstat JSON output
+        # Claude Code provides the exact end time for each block
+        end_time_iso=$(echo "$block_data" | jq -r '.blocks[0].end_time // null' 2>/dev/null)
         
-        # Get current UTC time
-        current_utc_hour=$(date -u '+%H')
-        current_utc_date=$(date -u '+%Y-%m-%d')
-        current_epoch=$(date "+%s")
-        
-        # Calculate the next 5-hour boundary
-        # Formula: next_block_hour = ((current_hour / 5) + 1) * 5
-        next_block_hour=$(( (current_utc_hour / 5 + 1) * 5 ))
-        
-        # Handle wraparound at 24:00 (becomes 00:00 next day)
-        if [ "$next_block_hour" -ge 24 ]; then
-            next_block_hour=$((next_block_hour - 24))
-            # Add one day to the date
-            end_date=$(date -u -v+1d '+%Y-%m-%d' 2>/dev/null || date -u -d "+1 day" '+%Y-%m-%d' 2>/dev/null)
-        else
-            end_date="$current_utc_date"
-        fi
-        
-        # Format the end time
-        end_time_formatted=$(printf "%s %02d:00:00" "$end_date" "$next_block_hour")
-        
-        # Convert to epoch - try macOS date first, then GNU date
-        end_epoch=$(date -j -u -f "%Y-%m-%d %H:%M:%S" "$end_time_formatted" "+%s" 2>/dev/null || date -u -d "$end_time_formatted" "+%s" 2>/dev/null)
-        
-        if [ -n "$end_epoch" ] && [ -n "$current_epoch" ]; then
-            remaining_seconds=$((end_epoch - current_epoch))
-            if [ "$remaining_seconds" -gt 0 ]; then
-                remaining_minutes=$((remaining_seconds / 60))
-                
-                if [ "$remaining_minutes" -lt 60 ]; then
-                    remaining_time_raw="${remaining_minutes}m left"
-                    time_color="$COLOR_TIME_WARNING"
+        if [ "$end_time_iso" != "null" ] && [ -n "$end_time_iso" ]; then
+            # Get current epoch time
+            current_epoch=$(date "+%s")
+            
+            # Convert ISO 8601 end time to epoch - try macOS date first, then GNU date
+            # The ISO format from ccstat includes timezone, e.g., "2025-08-11T18:00:00+00:00"
+            end_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${end_time_iso%+*}" "+%s" 2>/dev/null || date -u -d "${end_time_iso}" "+%s" 2>/dev/null)
+            
+            if [ -n "$end_epoch" ] && [ -n "$current_epoch" ]; then
+                remaining_seconds=$((end_epoch - current_epoch))
+                if [ "$remaining_seconds" -gt 0 ]; then
+                    remaining_minutes=$((remaining_seconds / 60))
+                    
+                    if [ "$remaining_minutes" -lt 60 ]; then
+                        remaining_time_raw="${remaining_minutes}m left"
+                        time_color="$COLOR_TIME_WARNING"
+                    else
+                        hours=$((remaining_minutes / 60))
+                        minutes=$((remaining_minutes % 60))
+                        remaining_time_raw="${hours}h ${minutes}m left"
+                        time_color="$COLOR_TIME_NORMAL"
+                    fi
                 else
-                    hours=$((remaining_minutes / 60))
-                    minutes=$((remaining_minutes % 60))
-                    remaining_time_raw="${hours}h ${minutes}m left"
-                    time_color="$COLOR_TIME_NORMAL"
+                    remaining_time_raw="expired"
+                    time_color="$COLOR_TIME_ERROR"
                 fi
             else
-                remaining_time_raw="expired"
+                remaining_time_raw="time error"
                 time_color="$COLOR_TIME_ERROR"
             fi
-        else
-            remaining_time_raw="time error"
-            time_color="$COLOR_TIME_ERROR"
         fi
         
         # Calculate daily usage percentage
