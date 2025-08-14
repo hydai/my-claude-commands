@@ -126,29 +126,29 @@ graph TB
         UI[User Interface]
         API[API Gateway]
     end
-    
+
     subgraph "Business Logic Layer"
         BL[Business Logic]
         WF[Workflow Engine]
     end
-    
+
     subgraph "Data Layer"
         DB[(Database)]
         Cache[Cache]
     end
-    
+
     subgraph "BDD Test Layer"
         Feature[Gherkin Features]
         Steps[Step Definitions]
         Fixtures[Test Fixtures]
     end
-    
+
     UI --> API
     API --> BL
     BL --> WF
     BL --> DB
     BL --> Cache
-    
+
     Feature --> Steps
     Steps --> API
     Steps --> Fixtures
@@ -163,18 +163,18 @@ graph LR
         SD[Step Definitions]
         TH[Test Hooks]
     end
-    
+
     subgraph "Test Infrastructure"
         TD[Test Data]
         TF[Test Fixtures]
         MS[Mock Services]
     end
-    
+
     subgraph "System Under Test"
         APP[Application]
         DB[(Test DB)]
     end
-    
+
     GF --> SD
     SD --> TH
     TH --> TD

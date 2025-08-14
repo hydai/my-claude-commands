@@ -69,32 +69,32 @@ usage_color="$COLOR_MUTED"
 
 if command -v ccstat >/dev/null 2>&1; then
     # Try to get active block from ccstat
-    block_data=$(ccstat blocks --active --json --quiet 2>/dev/null)
-    
+    block_data=$(ccstat blocks --active --json 2>/dev/null)
+
     if [ -n "$block_data" ]; then
         # Extract session cost
         cost_value=$(echo "$block_data" | jq -r '.blocks[0].total_cost // null' 2>/dev/null)
         if [ "$cost_value" != "null" ] && [ -n "$cost_value" ]; then
             session_cost_raw=$(printf "$%.2f" "$cost_value")
         fi
-        
+
         # Extract the actual end time from ccstat JSON output
         # Claude Code provides the exact end time for each block
         end_time_iso=$(echo "$block_data" | jq -r '.blocks[0].end_time // null' 2>/dev/null)
-        
+
         if [ "$end_time_iso" != "null" ] && [ -n "$end_time_iso" ]; then
             # Get current epoch time
             current_epoch=$(date "+%s")
-            
+
             # Convert ISO 8601 end time to epoch - try macOS date first, then GNU date
             # The ISO format from ccstat includes timezone, e.g., "2025-08-11T18:00:00+00:00"
             end_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${end_time_iso%+*}" "+%s" 2>/dev/null || date -u -d "${end_time_iso}" "+%s" 2>/dev/null)
-            
+
             if [ -n "$end_epoch" ] && [ -n "$current_epoch" ]; then
                 remaining_seconds=$((end_epoch - current_epoch))
                 if [ "$remaining_seconds" -gt 0 ]; then
                     remaining_minutes=$((remaining_seconds / 60))
-                    
+
                     if [ "$remaining_minutes" -lt 60 ]; then
                         remaining_time_raw="${remaining_minutes}m left"
                         time_color="$COLOR_TIME_WARNING"
@@ -113,38 +113,38 @@ if command -v ccstat >/dev/null 2>&1; then
                 time_color="$COLOR_TIME_ERROR"
             fi
         fi
-        
+
         # Calculate daily usage percentage
         # This shows how much of your daily budget you've used today
         # Formula: (today's total cost / daily budget) * 100
         # Where daily budget = $MONTHLY_BUDGET_USD / days_in_current_month
-        
+
         # Get today's cost from ccstat daily
-        today_cost=$(ccstat daily --json --quiet 2>/dev/null | jq -r '.daily[-1].total_cost // 0' 2>/dev/null)
-        
+        today_cost=$(ccstat daily --json 2>/dev/null | jq -r '.daily[-1].total_cost // 0' 2>/dev/null)
+
         if [ -n "$today_cost" ] && [ "$today_cost" != "0" ]; then
             # Calculate days in current month using cal command
             days_in_month=$(cal $(date '+%m %Y') 2>/dev/null | awk 'NF {DAYS=$NF} END {print DAYS}')
-            
+
             if [ -n "$days_in_month" ] && [ "$days_in_month" -gt 0 ]; then
                 # Calculate daily budget
                 # Formula: $MONTHLY_BUDGET_USD / days_in_month
                 # Example: With $200 budget and 31 days in August, daily budget = $200/31 = $6.45
                 daily_budget=$(echo "scale=2; $MONTHLY_BUDGET_USD / $days_in_month" | bc 2>/dev/null)
-                
+
                 if [ -n "$daily_budget" ]; then
                     # Calculate usage percentage
                     # Formula: (today_cost / daily_budget) * 100
                     # Example: If today_cost=$10 and daily_budget=$6.45, then usage=155%
                     usage_percent=$(echo "scale=1; ($today_cost / $daily_budget) * 100" | bc 2>/dev/null)
-                    
+
                     if [ -n "$usage_percent" ]; then
                         daily_usage_raw="${usage_percent}%"
-                        
+
                         # Apply color based on percentage thresholds
                         # Remove decimal part for comparison
                         percent_int=${usage_percent%.*}
-                        
+
                         if [ "$percent_int" -lt 80 ]; then
                             # Under 80%: Good - well within daily budget
                             usage_color="$COLOR_PERCENT_GOOD"
